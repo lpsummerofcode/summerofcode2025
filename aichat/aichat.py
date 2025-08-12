@@ -105,36 +105,40 @@ for message in current_messages:
 
 # --- User Input and Chat Logic ---
 if prompt := st.chat_input("What would you like to ask?"):
-    # Add user's message to the current bot's history
-    current_messages.append({"role": "user", "content": prompt})
-    
+
     # Display user's message
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Prepare messages for Ollama, including the system prompt
-    messages_for_ollama = []
-    # Add the system prompt from the bot's description
-    bot_description = st.session_state.bots[st.session_state.selected_bot_name]["description"]
-    messages_for_ollama.append({"role": "system", "content": bot_description})
-    # Add the rest of the conversation
-    messages_for_ollama.extend(current_messages)
+    # Add users message to every bot's history
+    for bot_name in bot_names:
+        
+        bot_messages = st.session_state.messages[bot_name]
+        bot_messages.append({"role": "user", "content": prompt})
     
-    # Display assistant's response
-    with st.chat_message("assistant"):
-        try:
-            def stream_ollama_response():
-                stream = client.chat(
-                    model=selected_model,
-                    messages=messages_for_ollama,
-                    stream=True,
-                )
-                for chunk in stream:
-                    yield chunk['message']['content']
+        # Prepare messages for Ollama, including the system prompt
+        messages_for_ollama = []
+        # Add the system prompt from the bot's description
+        bot_description = st.session_state.bots[bot_name]["description"]
+        messages_for_ollama.append({"role": "system", "content": bot_description})
+        # Add the rest of the conversation
+        messages_for_ollama.extend(bot_messages)
+        
+        # Display assistant's response
+        with st.chat_message("assistant"):
+            try:
+                def stream_ollama_response():
+                    stream = client.chat(
+                        model=selected_model,
+                        messages=messages_for_ollama,
+                        stream=True,
+                    )
+                    for chunk in stream:
+                        yield chunk['message']['content']
 
-            response = st.write_stream(stream_ollama_response)
-            # Add the full response to the current bot's history
-            current_messages.append({"role": "assistant", "content": response})
+                response = st.write_stream(stream_ollama_response)
+                # Add the full response to the current bot's history
+                bot_messages.append({"role": "assistant", "content": response})
 
-        except Exception as e:
-            st.error(f"An error occurred while communicating with Ollama: {e}")
+            except Exception as e:
+                st.error(f"An error occurred while communicating with Ollama: {e}")
