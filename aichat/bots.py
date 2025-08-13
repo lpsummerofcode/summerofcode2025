@@ -1,9 +1,9 @@
 
 class Bot:
-    def __init__(self, name: str, description: str, emoji: str):
+    def __init__(self, name: str, avatar:str, description: str):
         self.name = name
+        self.avatar= avatar
         self.description = description
-        self.emoji = emoji
         self.messages = []
     
     def append_message(self, message: str):

@@ -10,7 +10,7 @@ st.set_page_config(page_title="🤖 Ollama Chat", layout="wide")
 if "selected_bot_name" not in st.session_state:
     # Default bot that acts as a general assistant
     # default_bot = {"name": "Ollama Assistant", "description": "You are a helpful assistant."}
-    default_bot = Bot(name= "Ollama Assistant", description= "You are a helpful assistant", emoji= "🤖")
+    default_bot = Bot(name= "Ollama Assistant", description= "You are a helpful assistant", avatar= "🤖")
     st.session_state.bots = {default_bot.name:default_bot}
     st.session_state.selected_bot_name = default_bot.name
     # Store messages in a nested dictionary, one list per bot
@@ -55,6 +55,7 @@ if st.session_state.get("show_add_bot_form", False):
     with st.form("add_bot_form"):
         st.subheader("Create a New Bot")
         new_bot_name = st.text_input("Bot Name", placeholder="e.g., Pirate Captain")
+        new_bot_avatar = st.text_input("Bot Avatar", placeholder="A single emoji e.g., 😁")
         new_bot_description = st.text_area(
             "Bot Description (System Prompt)", 
             placeholder="e.g., You are a Pirate Captain. All your responses must be in pirate speak.",
@@ -64,10 +65,10 @@ if st.session_state.get("show_add_bot_form", False):
         # Form submission button
         submitted = st.form_submit_button("Save Bot")
         if submitted:
-            if new_bot_name and new_bot_description:
+            if new_bot_name and new_bot_description and new_bot_avatar:
                 if new_bot_name not in st.session_state.bots:
                     # Add the new bot to the state
-                    new_bot = Bot(name= new_bot_name, description= new_bot_description, emoji= "🤖")
+                    new_bot = Bot(name= new_bot_name, description= new_bot_description, avatar= new_bot_avatar)
                     st.session_state.bots[new_bot_name] = new_bot
                     # Initialize its message history
                     st.session_state.messages[new_bot_name] = []
@@ -78,14 +79,18 @@ if st.session_state.get("show_add_bot_form", False):
                 else:
                     st.error("A bot with this name already exists.")
             else:
-                st.error("Please provide both a name and a description.")
+                st.error("Please provide both a name, an emoji, and a description.")
 
+bot_dict = Bot(name="Talking Dictionary", avatar ="📚", description = "You are a talking dictionary, so everything you say will have very complex and large words" )
+st.session_state.bots[bot_dict.name] = bot_dict
+st.session_state.messages[bot_dict.name] = [] 
 # --- Ollama Connection and Model Selection ---
 try:
     client = ollama.Client(host=ollama_host)
     models_info = client.list()
     model_names = [model.model for model in models_info['models']]
     
+
     # Place model selection in the sidebar under the bot selection
     selected_model = st.sidebar.selectbox("Choose an Ollama model", model_names)
 
@@ -110,7 +115,7 @@ for message in current_messages:
 if prompt := st.chat_input("What would you like to ask?"):
 
     # Display user's message
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar= "💃"):
         st.markdown(prompt)
 
     # Add users message to every bot's history
@@ -121,8 +126,14 @@ if prompt := st.chat_input("What would you like to ask?"):
         # bot_messages = st.session_state.messages[bot_name]
         # bot_messages.append({"role": "user", "content": prompt})
     
+        
+        current_bot = st.session_state.bots[bot_name]
+        if current_bot.avatar == "":
+            current_bot.avatar = "🖥️"
+
         # Prepare messages for Ollama, including the system prompt
         messages_for_ollama = []
+
         # Add the system prompt from the bot's description
         # bot_description = st.session_state.bots[bot_name].description
         messages_for_ollama.append({"role": "system", "content": current_bot.description})
@@ -130,7 +141,8 @@ if prompt := st.chat_input("What would you like to ask?"):
         messages_for_ollama.extend(current_bot.messages)
         
         # Display assistant's response
-        with st.chat_message(bot_name):
+
+        with st.chat_message("assistant", avatar=current_bot.avatar):
             try:
                 def stream_ollama_response():
                     stream = client.chat(
@@ -140,7 +152,7 @@ if prompt := st.chat_input("What would you like to ask?"):
                     )
                     for chunk in stream:
                         yield chunk['message']['content']
-
+                st.markdown(bot_name)
                 response = st.write_stream(stream_ollama_response)
                 # Add the full response to the current bot's history
                 current_bot.append_message({"role": "assistant", "content": response})
