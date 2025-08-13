@@ -1,5 +1,6 @@
 import streamlit as st
 import ollama
+from bots import Bot
 
 # --- Page Configuration ---
 st.set_page_config(page_title="🤖 Ollama Chat", layout="wide")
@@ -8,9 +9,10 @@ st.set_page_config(page_title="🤖 Ollama Chat", layout="wide")
 # Initialize session state variables if they don't exist
 if "selected_bot_name" not in st.session_state:
     # Default bot that acts as a general assistant
-    default_bot = {"name": "Ollama Assistant", "description": "You are a helpful assistant."}
-    st.session_state.bots = {"Ollama Assistant": default_bot}
-    st.session_state.selected_bot_name = "Ollama Assistant"
+    # default_bot = {"name": "Ollama Assistant", "description": "You are a helpful assistant."}
+    default_bot = Bot(name= "Ollama Assistant", description= "You are a helpful assistant", emoji= "🤖")
+    st.session_state.bots = {default_bot.name:default_bot}
+    st.session_state.selected_bot_name = default_bot.name
     # Store messages in a nested dictionary, one list per bot
     st.session_state.messages = {"Ollama Assistant": []}
 
@@ -18,7 +20,7 @@ if "selected_bot_name" not in st.session_state:
 def reset_current_chat():
     """Resets the chat history for the currently selected bot."""
     bot_name = st.session_state.selected_bot_name
-    st.session_state.messages[bot_name] = []
+    st.session_state.bots[bot_name].messages = []
 
 # --- Sidebar ---
 st.sidebar.header("Configuration")
@@ -65,7 +67,8 @@ if st.session_state.get("show_add_bot_form", False):
             if new_bot_name and new_bot_description:
                 if new_bot_name not in st.session_state.bots:
                     # Add the new bot to the state
-                    st.session_state.bots[new_bot_name] = {"name": new_bot_name, "description": new_bot_description}
+                    new_bot = Bot(name= new_bot_name, description= new_bot_description, emoji= "🤖")
+                    st.session_state.bots[new_bot_name] = new_bot
                     # Initialize its message history
                     st.session_state.messages[new_bot_name] = []
                     # Switch to the new bot
@@ -112,20 +115,22 @@ if prompt := st.chat_input("What would you like to ask?"):
 
     # Add users message to every bot's history
     for bot_name in bot_names:
-        
-        bot_messages = st.session_state.messages[bot_name]
-        bot_messages.append({"role": "user", "content": prompt})
+        current_bot = st.session_state.bots[bot_name]
+        current_bot.append_message({"role": "user", "content": prompt})
+
+        # bot_messages = st.session_state.messages[bot_name]
+        # bot_messages.append({"role": "user", "content": prompt})
     
         # Prepare messages for Ollama, including the system prompt
         messages_for_ollama = []
         # Add the system prompt from the bot's description
-        bot_description = st.session_state.bots[bot_name]["description"]
-        messages_for_ollama.append({"role": "system", "content": bot_description})
+        # bot_description = st.session_state.bots[bot_name].description
+        messages_for_ollama.append({"role": "system", "content": current_bot.description})
         # Add the rest of the conversation
-        messages_for_ollama.extend(bot_messages)
+        messages_for_ollama.extend(current_bot.messages)
         
         # Display assistant's response
-        with st.chat_message("assistant"):
+        with st.chat_message(bot_name):
             try:
                 def stream_ollama_response():
                     stream = client.chat(
@@ -138,7 +143,7 @@ if prompt := st.chat_input("What would you like to ask?"):
 
                 response = st.write_stream(stream_ollama_response)
                 # Add the full response to the current bot's history
-                bot_messages.append({"role": "assistant", "content": response})
+                current_bot.append_message({"role": "assistant", "content": response})
 
             except Exception as e:
                 st.error(f"An error occurred while communicating with Ollama: {e}")
